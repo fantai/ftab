@@ -1,0 +1,13 @@
+@server = http://www.baidu.com
+
+POST {{server}}
+Content-Type: application/json
+
+{
+    "a": "b"
+}
+###
+
+# @name=hello
+
+GEt {{server}}

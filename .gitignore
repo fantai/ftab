@@ -1,0 +1,5 @@
+*.exe
+.vscode
+go.sum
+*.out
+proposal.http
