@@ -15,7 +15,7 @@ limitations under the License.
 */
 package main
 
-import "github.com/aifantai/ftab/cmd"
+import "github.com/fantai/ftab/cmd"
 
 func main() {
 	cmd.Execute()

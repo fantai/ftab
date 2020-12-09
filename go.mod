@@ -1,4 +1,4 @@
-module github.com/aifantai/ftab
+module github.com/fantai/ftab
 
 go 1.14
 

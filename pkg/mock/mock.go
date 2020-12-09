@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/aifantai/ftab/pkg/mock/cn"
+	"github.com/fantai/ftab/pkg/mock/cn"
 	"github.com/spf13/viper"
 )
 

@@ -1,13 +1,21 @@
-@server = http://www.baidu.com
+@server = http://127.0.0.1:6601
 
+# @name case1
 POST {{server}}
 Content-Type: application/json
 
 {
     "a": "b"
 }
+
+
 ###
 
-# @name=hello
+# @name hello
+POST {{server}}
+Content-Type: application/json
 
-GEt {{server}}
+{
+    "a1": "{{case1.request.body.$.a}}",
+    "a2": "{{case1.response.body.$.a}}"
+}

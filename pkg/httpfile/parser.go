@@ -11,20 +11,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aifantai/ftab/pkg/mock"
+	"github.com/fantai/ftab/pkg/mock"
 	"github.com/valyala/fasthttp"
 )
 
 // Case is a http request case
 type Case struct {
-	Name           string        // name of case
-	Method         string        // the method of case
-	URL            string        // the URL of case, URL maybe a variable
-	RespCode       int           // reponse code
-	RespBody       []byte        // resoonse bytes
+	Name           string // name of case
+	RespCode       int    // reponse code
+	RequestSize    int
+	ResponseSize   int           // resoonse bytes length
 	RespTime       time.Duration // response time
-	ReqHeader      map[string]string
-	ReqBody        *bytes.Buffer
 	request        *fasthttp.Request
 	response       *fasthttp.Response
 	parsedReqBody  interface{}
@@ -41,13 +38,14 @@ const (
 type HTTPFile struct {
 	Variables map[string]string // variable in this file
 	Cases     []*Case           // all cases
+	AutoClean bool              // automatic release resource, otherwise caller should do Release after use, default is true
 }
 
 // ###
 var newCaseTag, _ = regexp.Compile(`^\s*###\s*$`)
 
 // # @name=value
-var nameTag, _ = regexp.Compile(`^\s*#\s+@name\s*=\s*(\w+)\s*$`)
+var nameTag, _ = regexp.Compile(`^\s*#\s+@name\s*=?\s*(\w+)\s*$`)
 
 // GET url
 var firstLineTag, _ = regexp.Compile(`^\s*(GET|POST)\s+(.+?)\s*$`)
@@ -64,18 +62,28 @@ var commentTag, _ = regexp.Compile(`^\s*(#|//).*$`)
 // {{abc}}
 var variableRef, _ = regexp.Compile(`{{.+?}}`)
 
+// DisaableAutoClean disable clear after Exectue
+func DisaableAutoClean(f *HTTPFile) {
+	f.AutoClean = false
+}
+
+// Opt is option when parse HTTPFile
+type Opt func(f *HTTPFile)
+
 // ParseReader parse httpfile from a reader
-func ParseReader(r io.Reader) (*HTTPFile, error) {
+func ParseReader(r io.Reader, opts ...Opt) (*HTTPFile, error) {
 	s := bufio.NewScanner(r)
 
 	file := &HTTPFile{
 		Variables: make(map[string]string),
 		Cases:     make([]*Case, 0),
 	}
+	for _, opt := range opts {
+		opt(file)
+	}
 
 	thisCase := &Case{
-		ReqHeader: make(map[string]string),
-		ReqBody:   bytes.NewBuffer(nil),
+		request: fasthttp.AcquireRequest(),
 	}
 	stage := parseFileStage
 
@@ -86,8 +94,7 @@ func ParseReader(r io.Reader) (*HTTPFile, error) {
 		if newCaseTag.Match(line) {
 			file.Cases = append(file.Cases, thisCase)
 			thisCase = &Case{
-				ReqHeader: make(map[string]string),
-				ReqBody:   bytes.NewBuffer(nil),
+				request: fasthttp.AcquireRequest(),
 			}
 			stage = parseFileStage
 			continue
@@ -111,15 +118,16 @@ func ParseReader(r io.Reader) (*HTTPFile, error) {
 
 		groups = firstLineTag.FindSubmatch(line)
 		if groups != nil {
-			thisCase.Method = string(groups[1])
-			thisCase.URL = string(groups[2])
+			thisCase.request.Header.SetMethod(string(groups[1]))
+			thisCase.request.SetRequestURI(string(groups[2]))
+
 			continue
 		}
 
 		if stage < parseBodyStage {
 			groups = headerDefineTag.FindSubmatch(line)
 			if groups != nil {
-				thisCase.ReqHeader[string(groups[1])] = string(groups[2])
+				thisCase.request.Header.SetBytesKV(groups[1], groups[2])
 				stage = parseHeaderStage
 				continue
 			}
@@ -130,7 +138,7 @@ func ParseReader(r io.Reader) (*HTTPFile, error) {
 		}
 
 		if stage == parseBodyStage {
-			thisCase.ReqBody.Write(line)
+			thisCase.request.AppendBody(line)
 		}
 	}
 
@@ -140,51 +148,23 @@ func ParseReader(r io.Reader) (*HTTPFile, error) {
 }
 
 // ParseFile parse httpfile from a file
-func ParseFile(fileName string) (*HTTPFile, error) {
+func ParseFile(fileName string, opts ...Opt) (*HTTPFile, error) {
 	fp, err := os.Open(fileName)
 	if err != nil {
 		return nil, fmt.Errorf("open %s failed: %w", fileName, err)
 	}
 	defer fp.Close()
-	return ParseReader(fp)
+	return ParseReader(fp, opts...)
 }
 
 // ParseBytes parse httpfile from content
-func ParseBytes(content []byte) (*HTTPFile, error) {
+func ParseBytes(content []byte, opts ...Opt) (*HTTPFile, error) {
 	r := bytes.NewReader(content)
-	return ParseReader(r)
-}
-
-// ValueExtractor transform key to value
-type ValueExtractor interface {
-	// Get return the value by key, if not found key, should return "", false
-	Get(key string) (string, bool)
-}
-
-// MapValueExtractor is a ValueExtractor based on map[string]string
-type MapValueExtractor map[string]string
-
-// ListValueExtractor is a ValueExtractor based on []ValueExtractor
-type ListValueExtractor []ValueExtractor
-
-// Get is required by ValueExtractor interface
-func (me MapValueExtractor) Get(key string) (string, bool) {
-	val, ok := me[key]
-	return val, ok
-}
-
-// Get is required by ValueExtractor interface
-func (le ListValueExtractor) Get(key string) (string, bool) {
-	for _, e := range le {
-		if val, ok := e.Get(key); ok {
-			return val, ok
-		}
-	}
-	return "", false
+	return ParseReader(r, opts...)
 }
 
 // ReplaceVariable replace variable placeholder to value
-func ReplaceVariable(text []byte, ve ValueExtractor) []byte {
+func ReplaceVariable(text []byte, ve Replacer) []byte {
 	replaced := variableRef.ReplaceAllFunc([]byte(text), func(key []byte) []byte {
 		rkey := bytes.TrimSpace(key[2 : len(key)-2])
 		val, ok := ve.Get(string(rkey))
@@ -197,7 +177,7 @@ func ReplaceVariable(text []byte, ve ValueExtractor) []byte {
 }
 
 // ReplaceVariableString replace variable placeholder to value string
-func ReplaceVariableString(text string, ve ValueExtractor) string {
+func ReplaceVariableString(text string, ve Replacer) string {
 	return string(ReplaceVariable([]byte(text), ve))
 }
 
@@ -206,7 +186,8 @@ func (f *HTTPFile) Duplicate(useMock bool, expand bool) *HTTPFile {
 
 	result := HTTPFile{
 		Variables: make(map[string]string),
-		Cases:     append([]*Case{}, f.Cases...),
+		Cases:     make([]*Case, len(f.Cases)),
+		AutoClean: f.AutoClean,
 	}
 	for key, val := range f.Variables {
 		if useMock {
@@ -215,64 +196,75 @@ func (f *HTTPFile) Duplicate(useMock bool, expand bool) *HTTPFile {
 			result.Variables[key] = val
 		}
 	}
-	if expand {
-		for _, c := range f.Cases {
-			c.Method = ReplaceVariableString(c.Method, f)
-			c.URL = ReplaceVariableString(c.URL, f)
-			c.ReqBody = bytes.NewBuffer(ReplaceVariable(c.ReqBody.Bytes(), f))
+	for i := 0; i < len(f.Cases); i++ {
+		to := &Case{}
+		from := f.Cases[i]
+
+		to.Name = from.Name
+		to.request = fasthttp.AcquireRequest()
+		from.request.CopyTo(to.request)
+
+		if expand {
+			to.request.Header.SetMethodBytes(ReplaceVariable(to.request.Header.Method(), f))
+			to.request.SetRequestURIBytes(ReplaceVariable(to.request.RequestURI(), f))
+			to.request.SetBody(ReplaceVariable(to.request.Body(), f))
 		}
+
+		result.Cases[i] = to
 	}
 	return &result
 }
 
+// Release resource
+func (f *HTTPFile) Release() {
+	for _, c := range f.Cases {
+		if c.request != nil {
+			fasthttp.ReleaseRequest(c.request)
+		}
+		if c.response != nil {
+			fasthttp.ReleaseResponse(c.response)
+		}
+		c.request = nil
+		c.response = nil
+	}
+}
+
 // Execute the httfile
-func (f *HTTPFile) Execute(client *fasthttp.Client, ve ...ValueExtractor) error {
-	lists := append(make(ListValueExtractor, 0), ve...)
+func (f *HTTPFile) Execute(client *fasthttp.Client, ve ...Replacer) error {
+	lists := append(make(ListReplacer, 0), ve...)
 	lists = append(lists, f)
 
 	defer func() {
-		for _, c := range f.Cases {
-			if c.request != nil {
-				fasthttp.ReleaseRequest(c.request)
-			}
-			if c.response != nil {
-				fasthttp.ReleaseResponse(c.response)
-			}
-			c.request = nil
-			c.response = nil
+		if f.AutoClean {
+			f.Release()
 		}
 	}()
 
-	for _, c := range f.Cases {
+	for _, to := range f.Cases {
 
-		method := ReplaceVariableString(c.Method, lists)
-		url := ReplaceVariableString(c.URL, lists)
+		to.request.Header.SetMethodBytes(ReplaceVariable(to.request.Header.Method(), lists))
+		to.request.SetRequestURIBytes(ReplaceVariable(to.request.RequestURI(), lists))
+		to.request.SetBody(ReplaceVariable(to.request.Body(), lists))
 
-		req := fasthttp.AcquireRequest()
-		resp := fasthttp.AcquireResponse()
+		to.response = fasthttp.AcquireResponse()
 
-		req.Header.SetMethod(method)
-		req.SetRequestURI(url)
-
-		for key, val := range c.ReqHeader {
-			req.Header.Set(key, ReplaceVariableString(val, lists))
-		}
-		req.SetBody(ReplaceVariable(c.ReqBody.Bytes(), lists))
+		to.request.Header.VisitAll(func(key, val []byte) {
+			to.request.Header.SetBytesKV(key, ReplaceVariable(val, lists))
+		})
 
 		t1 := time.Now()
-		err := fasthttp.Do(req, resp)
+		err := fasthttp.Do(to.request, to.response)
 		if err != nil {
-			return fmt.Errorf("request %s failed: %w", url, err)
+			return fmt.Errorf("request %s failed: %w", string(to.request.RequestURI()), err)
 		}
 		t2 := time.Now()
 
-		c.RespCode = resp.StatusCode()
-		c.RespBody = append([]byte{}, resp.Body()...)
-		c.RespTime = t2.Sub(t1)
+		// will keep valid after Execute
+		to.RespCode = to.response.StatusCode()
+		to.RespTime = t2.Sub(t1)
+		to.RequestSize = len(to.request.Header.Header()) + len(to.request.Body()) + len(to.request.RequestURI())
+		to.ResponseSize = len(to.response.Header.Header()) + len(to.response.Body())
 
-		// request , response maybe used in next case
-		c.request = req
-		c.response = resp
 	}
 
 	return nil
@@ -325,11 +317,13 @@ func (f *HTTPFile) getHeaderVariable(key string) (string, bool) {
 		if theCase != nil {
 			switch kind {
 			case "request":
-				val, ok := theCase.ReqHeader[name]
-				return val, ok
+				val := theCase.request.Header.Peek(name)
+				if val != nil {
+					return string(val), false
+				}
 			case "response":
 				if theCase.response != nil {
-					val := theCase.response.Header.Peek(key)
+					val := theCase.response.Header.Peek(name)
 					if val != nil {
 						return string(val), false
 					}
@@ -363,7 +357,7 @@ func (f *HTTPFile) getJSONPathVariable(key string) (string, bool) {
 	switch kind {
 	case "request":
 		if theCase.parsedReqBody == nil {
-			json.Unmarshal(theCase.ReqBody.Bytes(), &theCase.parsedReqBody)
+			json.Unmarshal(theCase.request.Body(), &theCase.parsedReqBody)
 		}
 		return JSONPathGet(theCase.parsedReqBody, path), true
 	case "response":
@@ -381,7 +375,7 @@ func (f *HTTPFile) getJSONPathVariable(key string) (string, bool) {
 			if theCase.parsedRespBody == nil {
 				json.Unmarshal(body, &theCase.parsedRespBody)
 			}
-			return JSONPathGet(theCase.parsedReqBody, path), true
+			return JSONPathGet(theCase.parsedRespBody, path), true
 		}
 	}
 	return "", false

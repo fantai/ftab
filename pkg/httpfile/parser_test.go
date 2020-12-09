@@ -3,23 +3,20 @@ package httpfile
 import (
 	"encoding/json"
 	"fmt"
-	"sync"
 	"testing"
-	"time"
 
-	"github.com/aifantai/ftab/internal/echo"
 	"github.com/stretchr/testify/assert"
 	"github.com/valyala/fasthttp"
 )
 
-const host = "127.0.0.1:6061"
-const echoServer = "http://127.0.0.1:6061/"
+const host = "127.0.0.1:6601"
+const echoServer = "http://127.0.0.1:6601/"
 
 func TestMain(m *testing.M) {
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	go echo.Start(host, wg)
-	time.Sleep(time.Second)
+	//wg := &sync.WaitGroup{}
+	//wg.Add(1)
+	//go echo.Start(host, wg)
+	//time.Sleep(time.Second)
 	m.Run()
 }
 func TestParse(t *testing.T) {
@@ -39,7 +36,7 @@ func TestParse(t *testing.T) {
 	GET {{server}}
 	`
 
-	file, err := ParseBytes([]byte(content))
+	file, err := ParseBytes([]byte(content), DisaableAutoClean)
 	if err != nil {
 		t.Error(err)
 	}
@@ -49,16 +46,17 @@ func TestParse(t *testing.T) {
 	assert.Equal(t, "http://www.baidu.com", server)
 
 	assert.Equal(t, 2, len(file.Cases))
-	assert.Equal(t, "POST", file.Cases[0].Method)
-	assert.Equal(t, "application/json", string(file.Cases[0].ReqHeader["Content-Type"]))
-	assert.Equal(t, "{{server}}", string(file.Cases[0].URL))
-	assert.Equal(t, "http://www.baidu.com", ReplaceVariableString(file.Cases[0].URL, file))
+	assert.Equal(t, "POST", string(file.Cases[0].request.Header.Method()))
+	assert.Equal(t, "application/json", string(file.Cases[0].request.Header.ContentType()))
+	assert.Equal(t, "{{server}}", string(file.Cases[0].request.Header.RequestURI()))
+	assert.Equal(t, "http://www.baidu.com", string(ReplaceVariable(file.Cases[0].request.Header.RequestURI(), file)))
 
-	assert.JSONEq(t, `{"a":"b"}`, file.Cases[0].ReqBody.String())
+	assert.JSONEq(t, `{"a":"b"}`, string(file.Cases[0].request.Body()))
 
-	assert.Equal(t, "GET", file.Cases[1].Method)
+	assert.Equal(t, "GET", string(file.Cases[1].request.Header.Method()))
 	assert.Equal(t, "hello", file.Cases[1].Name)
 
+	file.Release()
 }
 
 func TestExecute(t *testing.T) {
@@ -86,7 +84,7 @@ func TestExecute(t *testing.T) {
 
 	`, echoServer)
 
-	file, err := ParseBytes([]byte(content))
+	file, err := ParseBytes([]byte(content), DisaableAutoClean)
 	if err != nil {
 		t.Error(err)
 	}
@@ -97,7 +95,7 @@ func TestExecute(t *testing.T) {
 	}
 
 	respDom := make(map[string]interface{})
-	err = json.Unmarshal(file.Cases[1].RespBody, &respDom)
+	err = json.Unmarshal(file.Cases[1].response.Body(), &respDom)
 	if err != nil {
 		t.Error(err)
 	}
@@ -105,6 +103,8 @@ func TestExecute(t *testing.T) {
 	assert.Equal(t, 2, len(respDom))
 	assert.Equal(t, "b", respDom["a1"])
 	assert.Equal(t, "b", respDom["a2"])
+
+	file.Release()
 }
 
 func BenchmarkExecute(b *testing.B) {

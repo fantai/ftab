@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
 func nowWithOffset(offest, option string) time.Time {
 	now := time.Now()
 	if offest != "" {

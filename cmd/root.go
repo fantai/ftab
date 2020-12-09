@@ -17,10 +17,12 @@ limitations under the License.
 */
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/fantai/ftab/pkg/httpfile"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -28,7 +30,9 @@ import (
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
+var cfgFile, testFile string
+var outputFormat string
+var conns, requests int
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -38,12 +42,34 @@ var rootCmd = &cobra.Command{
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	RunE: func(cmd *cobra.Command, args []string) error {
-		log, err := zap.NewDevelopment()
+
+		fp, err := os.Open(testFile)
 		if err != nil {
-			return err
+			return fmt.Errorf("open file: %w", err)
 		}
-		zap.ReplaceGlobals(log)
-		log.Info("hello")
+		defer fp.Close()
+
+		file, err := httpfile.ParseReader(fp)
+		if err != nil {
+			return fmt.Errorf("parse file: %w", err)
+		}
+		defer file.Release()
+
+		r := httpfile.ReportStat(httpfile.Bench(file, conns, requests))
+		r.Currency = conns
+
+		switch outputFormat {
+		case "plain":
+			httpfile.PlainOutput(&r, os.Stdout)
+		case "json":
+			text, err := json.MarshalIndent(&r, "", "  ")
+			if err != nil {
+				return fmt.Errorf("marshall json: %w", err)
+			}
+			fmt.Println(string(text))
+		default:
+			httpfile.HumanOutput(&r, os.Stdout)
+		}
 
 		return nil
 	},
@@ -52,6 +78,9 @@ var rootCmd = &cobra.Command{
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	log, _ := zap.NewDevelopment()
+	zap.ReplaceGlobals(log)
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -67,9 +96,12 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ftab.yaml)")
 
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.Flags().StringVarP(&outputFormat, "output", "m", "human", "result output format[plain, human, json]")
+	rootCmd.Flags().StringVarP(&testFile, "in", "i", "test.http", "the http file to bench")
+	rootCmd.Flags().IntVarP(&conns, "connections", "c", 1, "connection in this bench ")
+	rootCmd.Flags().IntVarP(&requests, "requests", "n", 1, "total requests in this bench ")
+
+	viper.BindPFlags(rootCmd.Flags())
 
 }
 
