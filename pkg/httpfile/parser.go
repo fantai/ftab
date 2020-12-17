@@ -102,7 +102,7 @@ func ParseReader(r io.Reader, opts ...Opt) (*HTTPFile, error) {
 
 		groups = variableDefineTag.FindSubmatch(line)
 		if groups != nil {
-			file.Variables[string(groups[1])] = string(groups[2])
+			file.Variables[string(groups[1])] = ReplaceVariableString(string(groups[2]), file)
 			continue
 		}
 
