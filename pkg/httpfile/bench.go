@@ -1,6 +1,7 @@
 package httpfile
 
 import (
+	"bytes"
 	"time"
 
 	"github.com/valyala/fasthttp"
@@ -56,4 +57,27 @@ func Bench(file *HTTPFile, connections, requests int) ([]Stat, float64) {
 			}
 		}
 	}
+}
+
+func Execute(file *HTTPFile) string {
+	client := &fasthttp.Client{}
+	w := file.Duplicate(true, true)
+	err := w.Execute(client)
+	if err != nil {
+		return err.Error()
+	}
+	buff := bytes.NewBuffer(nil)
+	for _, c := range w.Cases {
+		buff.Write(c.request.Header.Header())
+		buff.WriteString("\r\n")
+		buff.Write(c.request.Body())
+
+		buff.WriteString("\r\n")
+		buff.WriteString("\r\n")
+
+		buff.Write(c.response.Header.Header())
+		buff.WriteString("\r\n")
+		buff.Write(c.response.Body())
+	}
+	return buff.String()
 }

@@ -55,20 +55,25 @@ var rootCmd = &cobra.Command{
 		}
 		defer file.Release()
 
-		r := httpfile.ReportStat(httpfile.Bench(file, conns, requests))
-		r.Currency = conns
+		if requests > 1 {
+			r := httpfile.ReportStat(httpfile.Bench(file, conns, requests))
+			r.Currency = conns
 
-		switch outputFormat {
-		case "plain":
-			httpfile.PlainOutput(&r, os.Stdout)
-		case "json":
-			text, err := json.MarshalIndent(&r, "", "  ")
-			if err != nil {
-				return fmt.Errorf("marshall json: %w", err)
+			switch outputFormat {
+			case "plain":
+				httpfile.PlainOutput(&r, os.Stdout)
+			case "json":
+				text, err := json.MarshalIndent(&r, "", "  ")
+				if err != nil {
+					return fmt.Errorf("marshall json: %w", err)
+				}
+				fmt.Println(string(text))
+			default:
+				httpfile.HumanOutput(&r, os.Stdout)
 			}
-			fmt.Println(string(text))
-		default:
-			httpfile.HumanOutput(&r, os.Stdout)
+		} else {
+			traceInfo := httpfile.Execute(file)
+			fmt.Println(traceInfo)
 		}
 
 		return nil
