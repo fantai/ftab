@@ -17,15 +17,15 @@ import (
 
 // Case is a http request case
 type Case struct {
-	Name           string // name of case
-	RespCode       int    // reponse code
-	RequestSize    int
-	ResponseSize   int           // resoonse bytes length
-	RespTime       time.Duration // response time
-	request        *fasthttp.Request
-	response       *fasthttp.Response
-	parsedReqBody  interface{}
-	parsedRespBody interface{}
+	Name           string             // name of case
+	RespCode       int                // reponse code
+	RequestSize    int                // request body length
+	ResponseSize   int                // resoonse bytes length
+	RespTime       time.Duration      // response time
+	request        *fasthttp.Request  // the request object
+	response       *fasthttp.Response // the responsee object
+	parsedReqBody  interface{}        // parsed request body
+	parsedRespBody interface{}        // parsed response body
 }
 
 const (
@@ -102,7 +102,7 @@ func ParseReader(r io.Reader, opts ...Opt) (*HTTPFile, error) {
 
 		groups = variableDefineTag.FindSubmatch(line)
 		if groups != nil {
-			file.Variables[string(groups[1])] = ReplaceVariableString(string(groups[2]), file)
+			file.Variables[string(groups[1])] = string(groups[2])
 			continue
 		}
 
@@ -246,14 +246,14 @@ func (f *HTTPFile) Execute(client *fasthttp.Client, ve ...Replacer) error {
 		to.request.SetRequestURIBytes(ReplaceVariable(to.request.RequestURI(), lists))
 		to.request.SetBody(ReplaceVariable(to.request.Body(), lists))
 
-		to.response = fasthttp.AcquireResponse()
-
 		to.request.Header.VisitAll(func(key, val []byte) {
 			to.request.Header.SetBytesKV(key, ReplaceVariable(val, lists))
 		})
 
+		to.response = fasthttp.AcquireResponse()
+
 		t1 := time.Now()
-		err := fasthttp.Do(to.request, to.response)
+		err := client.Do(to.request, to.response)
 		if err != nil {
 			return fmt.Errorf("request %s failed: %w", string(to.request.RequestURI()), err)
 		}
@@ -264,7 +264,9 @@ func (f *HTTPFile) Execute(client *fasthttp.Client, ve ...Replacer) error {
 		to.RespTime = t2.Sub(t1)
 		to.RequestSize = len(to.request.Header.Header()) + len(to.request.Body()) + len(to.request.RequestURI())
 		to.ResponseSize = len(to.response.Header.Header()) + len(to.response.Body())
-
+		if to.RespCode != 200 {
+			return fmt.Errorf("response is not 200")
+		}
 	}
 
 	return nil
