@@ -59,6 +59,7 @@ func Bench(file *HTTPFile, connections, requests int) ([]Stat, float64) {
 	}
 }
 
+// Execute the file once
 func Execute(file *HTTPFile) string {
 	client := &fasthttp.Client{}
 	w := file.Duplicate(true, true)
