@@ -49,6 +49,17 @@ func pos(n int, p float64) int {
 	return pn
 }
 
+func removeFailed(stats []Stat) []Stat {
+	i := 0
+	for _, s := range stats {
+		if s.Successed > 0 {
+			stats[i] = s
+			i++
+		}
+	}
+	return stats[0:i]
+}
+
 // ReportStat generate report for stats
 func ReportStat(stats []Stat, totalTimeUsed float64) Report {
 	var report Report
@@ -73,15 +84,18 @@ func ReportStat(stats []Stat, totalTimeUsed float64) Report {
 	report.TotalTimeUsed = totalTimeUsed
 	report.RecvSpeed = float64(report.TotalRecv) / float64(report.TotalTimeUsed)
 	report.SendSpeed = float64(report.TotalSend) / float64(report.TotalTimeUsed)
-	report.AvgTimeUsed = sumTimeUsed / float64(report.TotalRequests)
-	report.RequestPerSecond = int((1.0 / report.TotalTimeUsed) * float64(report.TotalRequests))
-	report.MinTimeUsed = stats[0].TimeConsuming
-	report.MaxTimeUsed = stats[len(stats)-1].TimeConsuming
-	report.P50TimeUsed = stats[pos(report.TotalRequests, 0.50)].TimeConsuming
-	report.P75TimeUsed = stats[pos(report.TotalRequests, 0.75)].TimeConsuming
-	report.P90TimeUsed = stats[pos(report.TotalRequests, 0.90)].TimeConsuming
-	report.P95TimeUsed = stats[pos(report.TotalRequests, 0.95)].TimeConsuming
-	report.P99TimeUsed = stats[pos(report.TotalRequests, 0.99)].TimeConsuming
+
+	report.AvgTimeUsed = sumTimeUsed / float64(report.Successed)
+	report.RequestPerSecond = int((1.0 / report.TotalTimeUsed) * float64(report.Successed))
+
+	ss := removeFailed(stats)
+	report.MinTimeUsed = ss[0].TimeConsuming
+	report.MaxTimeUsed = ss[len(ss)-1].TimeConsuming
+	report.P50TimeUsed = ss[pos(len(ss), 0.50)].TimeConsuming
+	report.P75TimeUsed = ss[pos(len(ss), 0.75)].TimeConsuming
+	report.P90TimeUsed = ss[pos(len(ss), 0.90)].TimeConsuming
+	report.P95TimeUsed = ss[pos(len(ss), 0.95)].TimeConsuming
+	report.P99TimeUsed = ss[pos(len(ss), 0.99)].TimeConsuming
 
 	report.Stats = stats
 
