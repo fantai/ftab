@@ -301,6 +301,8 @@ func (f *HTTPFile) getBuildinVariable(key string) (string, bool) {
 	switch funcVar[0] {
 	case "$timestamp":
 		return funTimestamap(funcVar), true
+	case "$timestampms":
+		return funTimestamapms(funcVar), true
 	case "$randomInt":
 		return funRandomInt(funcVar), true
 	case "$datetime":

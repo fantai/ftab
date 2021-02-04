@@ -118,6 +118,17 @@ func funTimestamap(args []string) string {
 	return fmt.Sprintf("%d", now.Unix())
 }
 
+func funTimestamapms(args []string) string {
+	offset := ""
+	option := ""
+	if len(args) == 3 {
+		offset = args[1]
+		option = args[2]
+	}
+	now := nowWithOffset(offset, option)
+	return fmt.Sprintf("%d", now.UnixNano()/1e6)
+}
+
 func funDateTime(args []string) string {
 	offset := ""
 	option := ""
