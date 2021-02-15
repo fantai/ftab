@@ -17,8 +17,10 @@ limitations under the License.
 */
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -33,6 +35,7 @@ import (
 var cfgFile, testFile string
 var outputFormat string
 var conns, requests int
+var sandbox bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -54,6 +57,24 @@ var rootCmd = &cobra.Command{
 			return fmt.Errorf("parse file: %w", err)
 		}
 		defer file.Release()
+
+		if sandbox {
+			fp, err := os.Open(testFile)
+			if err != nil {
+				return fmt.Errorf("open file: %w", err)
+			}
+			defer fp.Close()
+			buff := bytes.NewBuffer(nil)
+			io.Copy(buff, fp)
+
+			body := buff.Bytes()
+
+			for i := 0; i < conns*requests; i++ {
+				out := httpfile.ReplaceVariable(body, file)
+				os.Stdout.Write(out)
+			}
+			return nil
+		}
 
 		if requests > 1 {
 			r := httpfile.ReportStat(httpfile.Bench(file, conns, requests))
@@ -105,6 +126,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&testFile, "in", "i", "test.http", "the http file to bench")
 	rootCmd.Flags().IntVarP(&conns, "connections", "c", 1, "connection in this bench ")
 	rootCmd.Flags().IntVarP(&requests, "requests", "n", 1, "total requests in this bench ")
+	rootCmd.Flags().BoolVarP(&sandbox, "sandbox", "s", false, "print case but don't execute")
 
 	viper.BindPFlags(rootCmd.Flags())
 

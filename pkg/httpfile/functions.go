@@ -103,7 +103,7 @@ func timeLayout(s string) string {
 	case "iso8601":
 		return "2006-01-02 03:04:05,.000"
 	default:
-		return layoutFromTimeFormat(s[1 : len(s)-1])
+		return layoutFromTimeFormat(s)
 	}
 }
 
