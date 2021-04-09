@@ -34,7 +34,7 @@ import (
 
 var cfgFile, testFile string
 var outputFormat string
-var conns, requests int
+var conns, requests, rateLimit int
 var sandbox bool
 
 // rootCmd represents the base command when called without any subcommands
@@ -76,9 +76,14 @@ var rootCmd = &cobra.Command{
 			return nil
 		}
 
+		if rateLimit < 0 {
+			rateLimit = 0
+		}
+
 		if requests > 1 {
-			r := httpfile.ReportStat(httpfile.Bench(file, conns, requests))
+			r := httpfile.ReportStat(httpfile.Bench(file, conns, requests, rateLimit))
 			r.Currency = conns
+			r.RateLimit = rateLimit
 
 			switch outputFormat {
 			case "plain":
@@ -126,6 +131,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&testFile, "in", "i", "test.http", "the http file to bench")
 	rootCmd.Flags().IntVarP(&conns, "connections", "c", 1, "connection in this bench ")
 	rootCmd.Flags().IntVarP(&requests, "requests", "n", 1, "total requests in this bench ")
+	rootCmd.Flags().IntVarP(&rateLimit, "rate", "r", 0, "requtes per second limit, <= 0 is no limit")
 	rootCmd.Flags().BoolVarP(&sandbox, "sandbox", "s", false, "print case but don't execute")
 
 	viper.BindPFlags(rootCmd.Flags())

@@ -20,25 +20,28 @@ type Stat struct {
 
 // Report is the statatics of results
 type Report struct {
-	TotalRequests    int
-	Currency         int
-	Successed        int
-	Failed           int
-	TotalSend        int
-	TotalRecv        int
-	TotalTimeUsed    float64
-	SendSpeed        float64
-	RecvSpeed        float64
-	AvgTimeUsed      float64
-	RequestPerSecond int
-	MaxTimeUsed      float64
-	MinTimeUsed      float64
-	P50TimeUsed      float64
-	P75TimeUsed      float64
-	P90TimeUsed      float64
-	P95TimeUsed      float64
-	P99TimeUsed      float64
-	Stats            []Stat
+	TotalRequests         int
+	Currency              int
+	Successed             int
+	RateLimit             int
+	Failed                int
+	TotalSend             int
+	TotalRecv             int
+	RequestTotalTimeUsed  float64
+	ResponseTotalTimeUsed float64
+	RequestPerSecond      int
+	ResponsePerSecond     int
+	SendSpeed             float64
+	RecvSpeed             float64
+	AvgTimeUsed           float64
+	MaxTimeUsed           float64
+	MinTimeUsed           float64
+	P50TimeUsed           float64
+	P75TimeUsed           float64
+	P90TimeUsed           float64
+	P95TimeUsed           float64
+	P99TimeUsed           float64
+	Stats                 []Stat
 }
 
 func pos(n int, p float64) int {
@@ -81,12 +84,14 @@ func ReportStat(stats []Stat, totalTimeUsed float64) Report {
 		report.Failed += s.Failed
 		sumTimeUsed = sumTimeUsed + s.TimeConsuming
 	}
-	report.TotalTimeUsed = totalTimeUsed
-	report.RecvSpeed = float64(report.TotalRecv) / float64(report.TotalTimeUsed)
-	report.SendSpeed = float64(report.TotalSend) / float64(report.TotalTimeUsed)
+	report.RequestTotalTimeUsed = totalTimeUsed
+	report.RecvSpeed = float64(report.TotalRecv) / float64(report.RequestTotalTimeUsed)
+	report.SendSpeed = float64(report.TotalSend) / float64(report.RequestTotalTimeUsed)
 
+	report.ResponseTotalTimeUsed = sumTimeUsed
 	report.AvgTimeUsed = sumTimeUsed / float64(report.Successed)
-	report.RequestPerSecond = int((1.0 / report.TotalTimeUsed) * float64(report.Successed))
+	report.RequestPerSecond = int((1.0 / report.RequestTotalTimeUsed) * float64(report.Successed))
+	report.ResponsePerSecond = int((1.0 / report.ResponseTotalTimeUsed) * float64(report.Successed))
 
 	ss := removeFailed(stats)
 	report.MinTimeUsed = ss[0].TimeConsuming
@@ -110,14 +115,21 @@ func PlainOutput(report *Report, w io.Writer) {
 	fmt.Fprintf(w, format, "Total Requests", report.TotalRequests)
 	fmt.Fprintf(w, format, "Currency", report.Currency)
 	fmt.Fprintf(w, format, "Successed", report.Successed)
+	fmt.Fprintf(w, format, "RateLimit", report.Successed)
 	fmt.Fprintf(w, format, "Failed", report.Failed)
-	fmt.Fprintf(w, format, "Time Used", report.TotalTimeUsed)
-	fmt.Fprintf(w, format, "Reqeusts Per Second", report.RequestPerSecond)
+	fmt.Fprintf(w, format, "Request Time Used", report.RequestTotalTimeUsed)
+	fmt.Fprintf(w, format, "Reqeust Per Second", report.RequestPerSecond)
 	fmt.Fprintf(w, format, "Send Speed", report.SendSpeed)
 	fmt.Fprintf(w, format, "Recv Speed", report.RecvSpeed)
 
 	fmt.Fprintln(w)
 
+	fmt.Fprintf(w, format, "Response Time Used", report.ResponseTotalTimeUsed)
+	fmt.Fprintf(w, format, "Response Per Second", report.ResponsePerSecond)
+
+	fmt.Fprintln(w)
+
+	fmt.Fprintf(w, format, "Total Time Used", report.ResponseTotalTimeUsed)
 	fmt.Fprintf(w, format, "Avg Time Used", report.AvgTimeUsed)
 	fmt.Fprintf(w, format, "Min Time Used", report.MinTimeUsed)
 	fmt.Fprintf(w, format, "Max Time Used", report.MaxTimeUsed)
@@ -188,10 +200,15 @@ func HumanOutput(report *Report, w io.Writer) {
 
 	fmt.Fprintln(w)
 
-	fmt.Fprintf(w, format, "Time Used", humanDuration(report.TotalTimeUsed), "")
-	fmt.Fprintf(w, format, "Reqeusts Per Second", thoundsNumber(report.RequestPerSecond), "/S")
+	fmt.Fprintf(w, format, "Request Time Used", humanDuration(report.RequestTotalTimeUsed), " (with request rate limit wait)")
+	fmt.Fprintf(w, format, "Reqeust Per Second", thoundsNumber(report.RequestPerSecond), "/S")
 	fmt.Fprintf(w, format, "Send Speed", bytesNumber(report.SendSpeed), "/S")
 	fmt.Fprintf(w, format, "Recv Speed", bytesNumber(report.RecvSpeed), "/S")
+
+	fmt.Fprintln(w)
+
+	fmt.Fprintf(w, format, "Response Time Used", humanDuration(report.ResponseTotalTimeUsed), " (without request rate limit wait)")
+	fmt.Fprintf(w, format, "Response Per Second", thoundsNumber(report.ResponsePerSecond), "/S")
 
 	fmt.Fprintln(w)
 

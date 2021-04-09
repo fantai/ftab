@@ -36,7 +36,7 @@ func TestBench(t *testing.T) {
 		t.Error(err)
 	}
 
-	stats, timeUsed := Bench(file, 100, 2000)
+	stats, timeUsed := Bench(file, 100, 2000, -1)
 
 	//t.Log(stats)
 

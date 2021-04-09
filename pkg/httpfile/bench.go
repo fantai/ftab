@@ -5,12 +5,24 @@ import (
 	"time"
 
 	"github.com/valyala/fasthttp"
+	"go.uber.org/ratelimit"
 )
+
+var client = &fasthttp.Client{
+	MaxConnsPerHost: 2048,
+	ReadTimeout:     time.Second,
+	WriteTimeout:    time.Second,
+}
+
+var rateLimiter ratelimit.Limiter
 
 func executeN(file *HTTPFile, n int, done chan bool, stats chan Stat) {
 
-	client := &fasthttp.Client{}
 	for i := 0; i < n; i++ {
+		if rateLimiter != nil {
+			rateLimiter.Take()
+		}
+
 		w := file.Duplicate(true, true)
 		err := w.Execute(client)
 
@@ -20,6 +32,7 @@ func executeN(file *HTTPFile, n int, done chan bool, stats chan Stat) {
 		} else {
 			stat.Successed = 1
 		}
+		stat.Requests = stat.Successed + stat.Failed
 		for _, c := range w.Cases {
 			stat.BytesSend = stat.BytesSend + c.RequestSize
 			stat.BytesReceived = stat.BytesReceived + c.ResponseSize
@@ -32,13 +45,19 @@ func executeN(file *HTTPFile, n int, done chan bool, stats chan Stat) {
 }
 
 // Bench the httpfile
-func Bench(file *HTTPFile, connections, requests int) ([]Stat, float64) {
+func Bench(file *HTTPFile, connections, requests, rateLimit int) ([]Stat, float64) {
 
 	stats := make(chan Stat, 1024)
 	done := make(chan bool, connections)
 	doneCounter := 0
 
 	requestsPerConnection := requests / connections
+
+	if rateLimit > 0 {
+		rateLimiter = ratelimit.New(rateLimit)
+	} else {
+		rateLimiter = nil
+	}
 
 	for c := 0; c < connections; c++ {
 		go executeN(file, requestsPerConnection, done, stats)
