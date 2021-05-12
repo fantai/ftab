@@ -124,11 +124,6 @@ func PlainOutput(report *Report, w io.Writer) {
 
 	fmt.Fprintln(w)
 
-	fmt.Fprintf(w, format, "Response Time Used", report.ResponseTotalTimeUsed)
-	fmt.Fprintf(w, format, "Response Per Second", report.ResponsePerSecond)
-
-	fmt.Fprintln(w)
-
 	fmt.Fprintf(w, format, "Total Time Used", report.ResponseTotalTimeUsed)
 	fmt.Fprintf(w, format, "Avg Time Used", report.AvgTimeUsed)
 	fmt.Fprintf(w, format, "Min Time Used", report.MinTimeUsed)
@@ -200,15 +195,11 @@ func HumanOutput(report *Report, w io.Writer) {
 
 	fmt.Fprintln(w)
 
-	fmt.Fprintf(w, format, "Request Time Used", humanDuration(report.RequestTotalTimeUsed), " (with request rate limit wait)")
-	fmt.Fprintf(w, format, "Reqeust Per Second", thoundsNumber(report.RequestPerSecond), "/S")
+	fmt.Fprintf(w, format, "Request Time Used", humanDuration(report.RequestTotalTimeUsed), "")
+	fmt.Fprintf(w, format, "Reqeust Per Second", thoundsNumber(report.RequestPerSecond), "/S  (with request rate limit wait)")
+	//fmt.Fprintf(w, format, "Reqeust Per Second", thoundsNumber(report.ResponsePerSecond), "/S  (without request rate limit wait)")
 	fmt.Fprintf(w, format, "Send Speed", bytesNumber(report.SendSpeed), "/S")
 	fmt.Fprintf(w, format, "Recv Speed", bytesNumber(report.RecvSpeed), "/S")
-
-	fmt.Fprintln(w)
-
-	fmt.Fprintf(w, format, "Response Time Used", humanDuration(report.ResponseTotalTimeUsed), " (without request rate limit wait)")
-	fmt.Fprintf(w, format, "Response Per Second", thoundsNumber(report.ResponsePerSecond), "/S")
 
 	fmt.Fprintln(w)
 
