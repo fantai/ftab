@@ -309,6 +309,8 @@ func (f *HTTPFile) getBuildinVariable(key string) (string, bool) {
 		return funDateTime(funcVar), true
 	case "$localDatetime":
 		return funLocalDateTime(funcVar), true
+	case "$randomFromFile":
+		return funRandomFromFile(funcVar), true
 	}
 	return "", false
 }

@@ -1,10 +1,13 @@
 package httpfile
 
 import (
+	"bufio"
 	"fmt"
 	"math/rand"
+	"os"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -173,4 +176,42 @@ func funRandomInt(args []string) string {
 	}
 
 	return fmt.Sprintf("%d", n)
+}
+
+var fileListCache = &sync.Map{}
+
+func funRandomFromFile(args []string) string {
+	if len(args) < 2 {
+		return ""
+	}
+
+	filePath := args[1]
+	if v, ok := fileListCache.Load(filePath); ok {
+		lists, ok := v.([]string)
+		if ok && len(lists) > 0 {
+			return lists[rand.Intn(len(lists))]
+		}
+	} else {
+		lists, err := readFileLines(filePath)
+		if err == nil && len(lists) > 0 {
+			fileListCache.Store(filePath, lists)
+			return lists[rand.Intn(len(lists))]
+		}
+	}
+	return ""
+}
+
+func readFileLines(filePath string) ([]string, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines, scanner.Err()
 }

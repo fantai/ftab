@@ -94,13 +94,16 @@ func ReportStat(stats []Stat, totalTimeUsed float64) Report {
 	report.ResponsePerSecond = int((1.0 / report.ResponseTotalTimeUsed) * float64(report.Successed))
 
 	ss := removeFailed(stats)
-	report.MinTimeUsed = ss[0].TimeConsuming
-	report.MaxTimeUsed = ss[len(ss)-1].TimeConsuming
-	report.P50TimeUsed = ss[pos(len(ss), 0.50)].TimeConsuming
-	report.P75TimeUsed = ss[pos(len(ss), 0.75)].TimeConsuming
-	report.P90TimeUsed = ss[pos(len(ss), 0.90)].TimeConsuming
-	report.P95TimeUsed = ss[pos(len(ss), 0.95)].TimeConsuming
-	report.P99TimeUsed = ss[pos(len(ss), 0.99)].TimeConsuming
+	if len(ss) > 0 {
+		report.Currency = ss[0].Requests
+		report.MinTimeUsed = ss[0].TimeConsuming
+		report.MaxTimeUsed = ss[len(ss)-1].TimeConsuming
+		report.P50TimeUsed = ss[pos(len(ss), 0.50)].TimeConsuming
+		report.P75TimeUsed = ss[pos(len(ss), 0.75)].TimeConsuming
+		report.P90TimeUsed = ss[pos(len(ss), 0.90)].TimeConsuming
+		report.P95TimeUsed = ss[pos(len(ss), 0.95)].TimeConsuming
+		report.P99TimeUsed = ss[pos(len(ss), 0.99)].TimeConsuming
+	}
 
 	report.Stats = stats
 
