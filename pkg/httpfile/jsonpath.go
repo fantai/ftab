@@ -28,10 +28,8 @@ func JSONPathGet(data interface{}, path string) string {
 	switch text := data.(type) {
 	case string:
 		data = objFromString([]byte(text))
-		break
 	case []byte:
 		data = objFromString([]byte(text))
-		break
 	}
 	if data == nil {
 		return ""

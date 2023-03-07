@@ -22,26 +22,19 @@ func nowWithOffset(offest, option string) time.Time {
 		d := option
 		switch d {
 		case "y":
-			now.AddDate(int(n), 0, 0)
-			break
+			now = now.AddDate(int(n), 0, 0)
 		case "M":
-			now.AddDate(0, int(n), 0)
-			break
+			now = now.AddDate(0, int(n), 0)
 		case "d":
-			now.AddDate(0, 0, int(n))
-			break
+			now = now.AddDate(0, 0, int(n))
 		case "h":
-			now.Add(time.Duration(n) * time.Hour)
-			break
+			now = now.Add(time.Duration(n) * time.Hour)
 		case "m":
-			now.Add(time.Duration(n) * time.Minute)
-			break
+			now = now.Add(time.Duration(n) * time.Minute)
 		case "s":
-			now.Add(time.Duration(n) * time.Second)
-			break
+			now = now.Add(time.Duration(n) * time.Second)
 		case "ms":
-			now.Add(time.Duration(n) * time.Millisecond)
-			break
+			now = now.Add(time.Duration(n) * time.Millisecond)
 		}
 
 	}

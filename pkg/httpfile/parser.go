@@ -372,7 +372,6 @@ func (f *HTTPFile) getJSONPathVariable(key string) (string, bool) {
 			switch string(theCase.response.Header.Peek("Content-Encoding")) {
 			case "gzip":
 				body, _ = theCase.response.BodyGunzip()
-				break
 			case "deflate":
 				body, _ = theCase.response.BodyInflate()
 			default:

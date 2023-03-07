@@ -9,7 +9,6 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-const host = "127.0.0.1:6601"
 const echoServer = "http://127.0.0.1:6601/"
 
 func TestMain(m *testing.M) {
